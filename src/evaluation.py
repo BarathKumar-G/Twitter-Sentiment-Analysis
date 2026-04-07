@@ -1,34 +1,20 @@
-"""
-evaluation.py - Model evaluation and error analysis for Twitter Sentiment Analysis.
-
-Provides:
-- Accuracy, confusion matrix, and classification report
-- Sample predictions printout
-- Error analysis with misclassification examples
-"""
-
 import numpy as np
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, roc_auc_score
-
-
-# ─── Label Mappings ──────────────────────────────────────────────────────────
 
 LABEL_MAP = {0: "Negative", 1: "Positive"}
 
 
-# ─── Core Evaluation ─────────────────────────────────────────────────────────
-
 def evaluate_model(y_true, y_pred, y_prob=None, model_name: str = "Model"):
     acc = accuracy_score(y_true, y_pred)
-    cm  = confusion_matrix(y_true, y_pred)
-    report = classification_report(y_true, y_pred,
-                                   target_names=["Negative", "Positive"])
+    cm = confusion_matrix(y_true, y_pred)
+    report = classification_report(y_true, y_pred, target_names=["Negative", "Positive"])
 
     print(f"\n{'='*60}")
     print(f"  Evaluation: {model_name}")
     print(f"{'='*60}")
     print(f"  Accuracy : {acc:.4f}  ({acc*100:.2f}%)")
 
+    auc = None
     if y_prob is not None:
         auc = roc_auc_score(y_true, y_prob)
         print(f"  ROC-AUC  : {auc:.4f}")
@@ -44,68 +30,41 @@ def evaluate_model(y_true, y_pred, y_prob=None, model_name: str = "Model"):
     print(f"    FP: {fp}, FN: {fn}")
 
     if fp > fn:
-        print("    → Bias towards Positive")
+        print("    -> Bias towards Positive")
     elif fn > fp:
-        print("    → Bias towards Negative")
+        print("    -> Bias towards Negative")
     else:
-        print("    → Balanced")
+        print("    -> Balanced")
 
     print(f"\n  Classification Report:")
     for line in report.splitlines():
         print(f"    {line}")
 
-    return acc, cm
+    return acc, auc, cm
 
-
-# ─── Sample Predictions ───────────────────────────────────────────────────────
 
 def show_sample_predictions(texts, y_true, y_pred, n: int = 8, model_name: str = ""):
-    """
-    Print n sample predictions showing: tweet → predicted vs. actual label.
-
-    Args:
-        texts:      Original tweet strings (for display).
-        y_true:     Ground-truth labels.
-        y_pred:     Predicted labels.
-        n:          Number of samples to show.
-        model_name: Label for the section header.
-    """
     print(f"\n--- Sample Predictions [{model_name}] ---")
     indices = np.arange(len(texts))
     np.random.seed(42)
     chosen = np.random.choice(indices, size=min(n, len(texts)), replace=False)
 
     for i, idx in enumerate(chosen, 1):
-        tweet   = str(texts[idx])[:90]         # Truncate long tweets
-        actual  = LABEL_MAP.get(int(y_true[idx]), str(y_true[idx]))
-        pred    = LABEL_MAP.get(int(y_pred[idx]), str(y_pred[idx]))
+        tweet = str(texts[idx])[:90]
+        actual = LABEL_MAP.get(int(y_true[idx]), str(y_true[idx]))
+        pred = LABEL_MAP.get(int(y_pred[idx]), str(y_pred[idx]))
         correct = "PASS" if actual == pred else "FAIL"
         print(f"  [{i}] {correct} | Actual: {actual:<9} | Predicted: {pred:<9}")
         print(f"       Tweet: \"{tweet}\"")
 
 
-# ─── Error Analysis ───────────────────────────────────────────────────────────
-
 def error_analysis(texts, y_true, y_pred, n: int = 5, model_name: str = ""):
-    """
-    Show examples of misclassified tweets and explain likely causes.
-
-    Analyses:
-    - False Positives: predicted Positive, actual Negative
-    - False Negatives: predicted Negative, actual Positive
-
-    Args:
-        texts:  Original tweet strings.
-        y_true: Ground-truth labels.
-        y_pred: Predicted labels.
-        n:      Number of examples per error type.
-    """
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    texts  = np.array(texts)
+    texts = np.array(texts)
 
-    fp_mask = (y_pred == 1) & (y_true == 0)   # False Positives
-    fn_mask = (y_pred == 0) & (y_true == 1)   # False Negatives
+    fp_mask = (y_pred == 1) & (y_true == 0)
+    fn_mask = (y_pred == 0) & (y_true == 1)
 
     fp_tweets = texts[fp_mask][:n]
     fn_tweets = texts[fn_mask][:n]
@@ -116,7 +75,7 @@ def error_analysis(texts, y_true, y_pred, n: int = 5, model_name: str = ""):
     print(f"{'='*60}")
 
     print(f"\n  False Positives (predicted Positive, actually Negative):")
-    print("  Likely causes: sarcasm, irony, negation ('not happy'), noise")
+    print("  Likely causes: sarcasm, irony, negation, noise")
     for i, tweet in enumerate(fp_tweets, 1):
         print(f"    [{i}] \"{str(tweet)[:100]}\"")
 
@@ -124,8 +83,6 @@ def error_analysis(texts, y_true, y_pred, n: int = 5, model_name: str = ""):
     print("  Likely causes: underrepresented positive phrases, rare slang, mixed sentiment")
     for i, tweet in enumerate(fn_tweets, 1):
         print(f"    [{i}] \"{str(tweet)[:100]}\"")
-
-    # --- Dynamic Observations ---
 
     print(f"\n  Key Observations:")
 
@@ -146,3 +103,28 @@ def error_analysis(texts, y_true, y_pred, n: int = 5, model_name: str = ""):
 
     if fp_mask.sum() + fn_mask.sum() == 0:
         print("  - No misclassifications detected (perfect performance on this set).")
+
+
+def compare_models(results: dict):
+    print(f"\n{'='*60}")
+    print(f"  MODEL COMPARISON SUMMARY")
+    print(f"{'='*60}")
+    print(f"  {'Combination':<45} {'Accuracy':>9} {'ROC-AUC':>9}")
+    print(f"  {'-'*63}")
+
+    best_name = None
+    best_score = -1.0
+
+    for combo_name, (acc, auc) in results.items():
+        auc_str = f"{auc:.4f}" if auc is not None else "  N/A  "
+        print(f"  {combo_name:<45} {acc:.4f}   {auc_str}")
+
+        composite = (acc + (auc if auc is not None else 0)) / 2
+        if composite > best_score:
+            best_score = composite
+            best_name = combo_name
+
+    print(f"\n  Best combination : {best_name}")
+    print(f"  Best score       : {best_score:.4f}  (avg of Accuracy + ROC-AUC)")
+
+    return best_name

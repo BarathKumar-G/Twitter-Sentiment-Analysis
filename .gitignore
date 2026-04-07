@@ -3,3 +3,4 @@
 /_pycache
 /venv
 *.pyc
+/models

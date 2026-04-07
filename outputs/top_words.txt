@@ -1,0 +1,43 @@
+Top 20 Positive Words:
+thank: 5.2015
+thanks: 5.0364
+don forget: 4.9329
+wish luck: 4.7280
+welcome: 4.5978
+happy: 4.3348
+yay: 4.0592
+hehe: 4.0274
+awesome: 3.8874
+glad: 3.8613
+smile: 3.7473
+don worry: 3.7284
+love: 3.7218
+excite: 3.6567
+good: 3.6078
+great: 3.6058
+congrats: 3.5842
+cool: 3.5766
+hehehe: 3.5321
+woohoo: 3.4939
+
+Top 20 Negative Words:
+sad: -12.4069
+miss: -8.2151
+hurt: -6.3894
+sick: -6.3830
+poor: -6.3522
+wish: -6.1704
+suck: -5.9251
+hate: -5.6787
+bad: -5.5468
+sadly: -5.5465
+ugh: -5.3987
+not_feel: -5.3535
+upset: -5.2387
+headache: -5.1384
+gutted: -5.0608
+unfortunately: -5.0379
+cancel: -4.9506
+lose: -4.9106
+not_happy: -4.6950
+disappointed: -4.5441

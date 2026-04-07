@@ -1,28 +1,27 @@
-"""
-preprocessing.py - Data loading and text preprocessing for Twitter Sentiment Analysis.
-
-Handles:
-- Loading train/test CSVs with automatic column detection
-- Cleaning tweets (lowercase, remove URLs, mentions, special chars)
-- Handling missing values
-"""
-
 import re
 import pandas as pd
+import nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import wordnet
 
+_lemmatizer = WordNetLemmatizer()
 
-# ─── Column Detection ────────────────────────────────────────────────────────
+def _get_wordnet_pos(treebank_tag):
+    if treebank_tag.startswith('J'):
+        return wordnet.ADJ
+    elif treebank_tag.startswith('V'):
+        return wordnet.VERB
+    elif treebank_tag.startswith('N'):
+        return wordnet.NOUN
+    elif treebank_tag.startswith('R'):
+        return wordnet.ADV
+    return wordnet.NOUN
 
 TEXT_ALIASES = ["sentence", "text", "tweet", "content", "message"]
 LABEL_ALIASES = ["sentiment", "label", "target", "class", "polarity"]
 
 
 def detect_columns(df: pd.DataFrame):
-    """
-    Auto-detect the text and label column names from a DataFrame.
-    Checks lowercase column names against known aliases.
-    Returns (text_col, label_col) or raises ValueError if not found.
-    """
     cols_lower = {c.lower(): c for c in df.columns}
 
     text_col = None
@@ -47,41 +46,24 @@ def detect_columns(df: pd.DataFrame):
     return text_col, label_col
 
 
-# ─── Data Loading ────────────────────────────────────────────────────────────
-
 def load_data(filepath: str, sample_size: int = None) -> pd.DataFrame:
-    """
-    Load a CSV file and return a cleaned DataFrame.
-
-    Args:
-        filepath:    Path to the CSV file.
-        sample_size: If provided, randomly sample this many rows (for large files).
-
-    Returns:
-        DataFrame with `text` and `label` columns.
-    """
     print(f"  Loading: {filepath}")
     df = pd.read_csv(filepath, encoding="utf-8", on_bad_lines="skip")
     print(f"  Raw shape: {df.shape}")
 
-    # Auto-detect columns
     text_col, label_col = detect_columns(df)
-    print(f"  Detected columns — text: '{text_col}', label: '{label_col}'")
+    print(f"  Detected columns - text: '{text_col}', label: '{label_col}'")
 
-    # Standardise column names
     df = df[[text_col, label_col]].rename(columns={text_col: "text", label_col: "label"})
 
-    # Drop rows with missing values
     before = len(df)
     df = df.dropna(subset=["text", "label"])
     dropped = before - len(df)
     if dropped:
         print(f"  Dropped {dropped} rows with missing values.")
 
-    # Ensure label is integer
     df["label"] = df["label"].astype(int)
 
-    # Optional sampling (used for large training sets on limited hardware)
     if sample_size and len(df) > sample_size:
         df = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
         print(f"  Sampled {sample_size} rows from training data.")
@@ -90,37 +72,27 @@ def load_data(filepath: str, sample_size: int = None) -> pd.DataFrame:
     return df
 
 
-# ─── Text Cleaning ───────────────────────────────────────────────────────────
-
 def clean_text(text: str) -> str:
-    """
-    Clean a single tweet string.
-
-    Steps:
-    1. Lowercase
-    2. Remove URLs (http/https/www)
-    3. Remove @mentions
-    4. Remove hashtag symbol (keep the word)
-    5. Remove special characters / punctuation (keep alphanumeric + spaces)
-    6. Collapse multiple spaces
-    """
     text = str(text).lower()
-    text = re.sub(r"http\S+|www\S+", "", text)          # Remove URLs
-    text = re.sub(r"@\w+", "", text)                    # Remove @mentions
-    text = re.sub(r"#", "", text)                       # Remove # symbol
-    text = re.sub(r"[^a-z0-9\s]", "", text)             # Keep only alphanumeric
-    text = re.sub(r"\s+", " ", text).strip()            # Collapse whitespace
+    text = re.sub(r"&amp;?", " and ", text)
+    text = re.sub(r"&quot;?", " ", text)
+    text = re.sub(r"http\S+|www\S+", "", text)
+    text = re.sub(r"@\w+", "", text)
+    text = re.sub(r"#", "", text)
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    text = re.sub(r"\bamp\b", " and ", text)
+    text = re.sub(r"\bquot\b", " ", text)
+    tokens = text.split()
+    pos_tags = nltk.pos_tag(tokens)
+    text = " ".join(_lemmatizer.lemmatize(word, _get_wordnet_pos(tag)) for word, tag in pos_tags)
+    text = re.sub(r"\bnot\s+(\w+)", r"not_\1", text)
     return text
 
 
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply text cleaning to the entire DataFrame in-place (new 'clean_text' column).
-    """
     df = df.copy()
     df["clean_text"] = df["text"].apply(clean_text)
 
-    # Drop rows where clean_text is empty after cleaning
     before = len(df)
     df = df[df["clean_text"].str.strip().str.len() > 0].reset_index(drop=True)
     if len(df) < before:
