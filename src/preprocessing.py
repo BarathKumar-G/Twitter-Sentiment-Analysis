@@ -82,10 +82,11 @@ def clean_text(text: str) -> str:
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     text = re.sub(r"\bamp\b", " and ", text)
     text = re.sub(r"\bquot\b", " ", text)
+    text = re.sub(r"(.)\1{2,}", r"\1\1", text)
+    text = re.sub(r"\bnot\s+(\w+)", r"not_\1", text)
     tokens = text.split()
     pos_tags = nltk.pos_tag(tokens)
     text = " ".join(_lemmatizer.lemmatize(word, _get_wordnet_pos(tag)) for word, tag in pos_tags)
-    text = re.sub(r"\bnot\s+(\w+)", r"not_\1", text)
     return text
 
 
